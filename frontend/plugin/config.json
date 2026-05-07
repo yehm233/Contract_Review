@@ -1,0 +1,16 @@
+{
+  "name": "Contract Review Pro",
+  "guid": "asc.{D01C5D71-5575-4FB2-98B5-0D6E6C8A7E22}",
+  "baseUrl": "",
+  "variations": [
+    {
+      "description": "Contract Review Sidebar",
+      "url": "index.html",
+      "icons": [],
+      "isViewer": false,
+      "EditorsSupport": ["word"],
+      "type": "right",
+      "buttons": []
+    }
+  ]
+}
