@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contract Review Pro</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 12px; }
+      button { cursor: pointer; }
+      .card { border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-top: 8px; }
+      .high { border-left: 4px solid #d93025; }
+      .medium { border-left: 4px solid #f9ab00; }
+      .low { border-left: 4px solid #188038; }
+      .muted { color: #666; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h3>合同审查</h3>
+    <input id="contractId" placeholder="输入 contract_id" style="width: 100%;" />
+    <button id="startBtn" style="margin-top: 8px; width: 100%;">开始审查</button>
+    <div id="result" style="margin-top: 12px;"></div>
+
+    <script src="https://onlyoffice.github.io/sdkjs-plugins/v1/plugins.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
