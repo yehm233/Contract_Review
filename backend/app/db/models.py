@@ -14,6 +14,7 @@ class ContractStatus(str, Enum):
     DRAFT = "DRAFT"
     REVIEWING = "REVIEWING"
     FINISHED = "FINISHED"
+    FAILED = "FAILED"
 
 
 class Contract(Base):

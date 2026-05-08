@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import MCP_SSE_URL, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
+
+logger = logging.getLogger("app.langchain_review")
 
 
 class LangChainWorkflowUnavailable(RuntimeError):
@@ -49,16 +52,26 @@ class LangChainReviewWorkflow:
     async def review(self, contract_text: str) -> dict[str, Any]:
         text = self._normalize_contract_text(contract_text)
         agent = await self._load_agent()
-        result = await agent.ainvoke(
-            {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": self._build_review_request(text),
-                    }
-                ]
-            }
-        )
+        logger.info("Agent review started | text_len=%d", len(text))
+        try:
+            result = await agent.ainvoke(
+                {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": self._build_review_request(text),
+                        }
+                    ]
+                }
+            )
+        except LangChainWorkflowUnavailable:
+            raise
+        except Exception as exc:
+            logger.exception("Agent ainvoke failed")
+            raise LangChainWorkflowUnavailable(
+                f"Agent execution failed: {type(exc).__name__}: {exc}"
+            ) from exc
+
         messages = list(result.get("messages") or [])
         payload = self._extract_structured_payload(result, messages)
         workflow = {
@@ -70,6 +83,7 @@ class LangChainReviewWorkflow:
             "tool_calls": self._collect_tool_trace(messages),
             "tools_used": self._collect_tool_names(messages),
         }
+        logger.info("Agent review done | tools_used=%s", workflow["tools_used"])
         return {
             "workflow": workflow,
             "entities": payload["entities"],
@@ -81,16 +95,34 @@ class LangChainReviewWorkflow:
     async def review_direct(self, contract_text: str) -> dict[str, Any]:
         text = self._normalize_contract_text(contract_text)
         tool_map = await self._load_tool_map()
-        entities = await tool_map["extract_contract_entities"].ainvoke({"text": text})
-        risk_payload = await tool_map["risk_assessment_scan"].ainvoke({"text": text})
+        logger.info("Direct review started | text_len=%d", len(text))
+
+        try:
+            entities = await tool_map["extract_contract_entities"].ainvoke({"text": text})
+        except Exception as exc:
+            logger.exception("extract_contract_entities failed")
+            entities = {"party_a": "未识别", "party_b": "未识别", "error": str(exc)}
+
+        try:
+            risk_payload = await tool_map["risk_assessment_scan"].ainvoke({"text": text})
+        except Exception as exc:
+            logger.exception("risk_assessment_scan failed")
+            risk_payload = {"findings": [], "error": str(exc)}
+
         findings = list(risk_payload.get("findings") or [])
         for finding in findings:
             severity = str(finding.get("severity", "")).upper()
             if severity in {"HIGH", "MEDIUM"}:
-                finding["proposed_clause"] = await tool_map["generate_revision_clause"].ainvoke(
-                    {"risk_type": finding.get("risk_type", "通用风险")}
-                )
+                try:
+                    finding["proposed_clause"] = await tool_map["generate_revision_clause"].ainvoke(
+                        {"risk_type": finding.get("risk_type", "通用风险")}
+                    )
+                except Exception as exc:
+                    logger.exception("generate_revision_clause failed for %s", finding.get("risk_type"))
+                    finding["proposed_clause"] = f"（生成失败：{exc}）"
+
         summary = self._build_direct_summary(findings)
+        logger.info("Direct review done | findings=%d", len(findings))
         return {
             "workflow": {
                 "mode": "mcp_direct_compat",
@@ -143,6 +175,7 @@ class LangChainReviewWorkflow:
             response_format=AgentReviewPayload,
             name="contract_review_agent",
         )
+        logger.info("Agent created | model=%s tools=%d", OPENAI_MODEL, len(tools))
         return self._agent
 
     def _build_chat_model(self) -> Any:
@@ -174,6 +207,7 @@ class LangChainReviewWorkflow:
                 "langgraph agent workflow requires `langchain-mcp-adapters`."
             ) from exc
 
+        logger.info("Connecting to MCP server at %s", MCP_SSE_URL)
         self._client = MultiServerMCPClient(
             {
                 "contract_review": {
@@ -182,7 +216,14 @@ class LangChainReviewWorkflow:
                 }
             }
         )
-        self._tools = await self._client.get_tools()
+        try:
+            self._tools = await self._client.get_tools()
+        except Exception as exc:
+            logger.exception("Failed to connect to MCP server")
+            raise LangChainWorkflowUnavailable(
+                f"Cannot connect to MCP server at {MCP_SSE_URL}: {exc}"
+            ) from exc
+
         self._tool_map = {tool.name: tool for tool in self._tools}
         required = {
             "extract_contract_entities",
@@ -194,6 +235,7 @@ class LangChainReviewWorkflow:
             raise LangChainWorkflowUnavailable(
                 f"MCP server missing required tools: {', '.join(missing)}"
             )
+        logger.info("MCP tools loaded: %s", [t.name for t in self._tools])
         return self._tools
 
     async def _load_tool_map(self) -> dict[str, Any]:
@@ -235,6 +277,7 @@ class LangChainReviewWorkflow:
         try:
             payload = AgentReviewPayload.model_validate(data)
         except Exception as exc:
+            logger.error("Failed to validate AgentReviewPayload: %s", exc)
             raise LangChainWorkflowUnavailable(
                 "agent finished without a valid structured review payload."
             ) from exc
