@@ -20,4 +20,4 @@ async def onlyoffice_callback(payload: dict):
 @router.post('/api/review/start')
 async def review_start(req: ReviewStartRequest):
     async with SessionLocal() as session:
-        return await run_review(session, req.contract_id)
+        return await run_review(session, req.contract_id, req.contract_text)
