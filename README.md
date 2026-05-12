@@ -25,7 +25,8 @@
   - [10.5 验证部署](#105-验证部署)
 - [11. 开发指南](#11-开发指南)
 - [12. 故障排查](#12-故障排查)
-- [13. 参考项目](#13-参考项目)
+- [13. 变更记录](#13-变更记录)
+- [14. 参考项目](#14-参考项目)
 
 ---
 
@@ -123,12 +124,13 @@
 ```text
 Contract_Review/
 ├── README.md                          # 本文件
+├── .env                               # 环境变量配置（不提交 Git）
 ├── requirements.txt                   # Python 依赖清单
 │
 ├── backend/                           # FastAPI 后端
 │   ├── main.py                        # Uvicorn 入口，re-export app
 │   └── app/
-│       ├── main.py                    # FastAPI 应用工厂，启动事件，全局异常处理
+│       ├── main.py                    # FastAPI 应用工厂，启动事件，全局异常处理，dotenv 加载
 │       ├── api/
 │       │   └── routes.py              # API 路由定义
 │       │       ├── POST /api/onlyoffice/callback  # OnlyOffice 文件保存回调
@@ -146,7 +148,7 @@ Contract_Review/
 │           └── storage.py             # MinIO 文件存储服务
 │
 ├── mcp_server/                        # MCP 工具服务器
-│   ├── main.py                        # MCP Server 入口（SSE 传输）
+│   ├── main.py                        # MCP Server 入口（SSE 传输，dotenv 加载）
 │   └── app/
 │       ├── llm.py                     # LLM 客户端封装（openai SDK，共享环境变量）
 │       └── server.py                  # 5 个 MCP 工具定义（LLM 驱动 + 降级 fallback）
@@ -394,6 +396,8 @@ OnlyOffice Document Server 的文件保存回调。
 
 ## 9. 配置项
 
+所有配置通过项目根目录的 `.env` 文件管理，后端和 MCP Server 启动时自动加载（基于 `python-dotenv`）。
+
 以下环境变量由后端和 MCP Server **共享**：
 
 | 变量 | 默认值 | 必填 | 说明 |
@@ -402,12 +406,36 @@ OnlyOffice Document Server 的文件保存回调。
 | `OPENAI_BASE_URL` | `""` | 否 | OpenAI 兼容 API 地址（留空则用官方端点） |
 | `OPENAI_MODEL` | `gpt-4.1-mini` | 否 | 模型名称 |
 | `REVIEW_WORKFLOW_MODE` | `langchain` | 否 | `langchain`（Agent 模式）或 `compat_direct`（直接调用） |
-| `MCP_SSE_URL` | `http://127.0.0.1:8000/sse` | 否 | MCP Server SSE 地址 |
-| `DATABASE_URL` | `mysql+aiomysql://root:password@172.27.3.6:3306/contract_review` | 否 | MySQL 连接字符串 |
-| `MINIO_ENDPOINT` | `172.27.3.6:9000` | 否 | MinIO 地址 |
+| `MCP_HTTP_BASE` | `http://127.0.0.1:8000` | 否 | MCP Server 基础地址 |
+| `DATABASE_URL` | `mysql+aiomysql://root:password@127.0.0.1:3306/contract_review` | 否 | MySQL 连接字符串 |
+| `MINIO_ENDPOINT` | `127.0.0.1:9000` | 否 | MinIO 地址 |
 | `MINIO_ACCESS_KEY` | `minioadmin` | 否 | MinIO 访问密钥 |
 | `MINIO_SECRET_KEY` | `minioadmin` | 否 | MinIO 密钥 |
 | `MINIO_BUCKET` | `contracts` | 否 | MinIO 存储桶名称 |
+
+### .env 文件示例
+
+```bash
+# MySQL
+DATABASE_URL=mysql+aiomysql://root:password@127.0.0.1:3306/contract_review
+
+# MinIO
+MINIO_ENDPOINT=127.0.0.1:9000
+MINIO_ACCESS_KEY=your-access-key
+MINIO_SECRET_KEY=your-secret-key
+MINIO_BUCKET=contracts
+
+# MCP Server
+MCP_HTTP_BASE=http://127.0.0.1:8000
+
+# LLM（必填）
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_BASE_URL=
+OPENAI_MODEL=gpt-4.1-mini
+
+# 工作流模式
+REVIEW_WORKFLOW_MODE=langchain
+```
 
 > 如果你使用兼容 OpenAI API 的模型网关（如 Azure OpenAI、Ollama、vLLM 等），配置 `OPENAI_BASE_URL` 和 `OPENAI_API_KEY` 即可，无需修改代码。
 
@@ -504,30 +532,30 @@ pip install -r requirements.txt
 
 #### 10.3.2 配置环境变量
 
-创建 `.env` 文件或直接 export：
+在项目根目录创建 `.env` 文件（已加入 `.gitignore`，不会提交到仓库）：
 
 ```bash
-# 必填：LLM 配置
-export OPENAI_API_KEY="sk-your-api-key-here"
-
-# 可选：使用兼容 API 网关
-export OPENAI_BASE_URL="https://api.openai.com/v1"   # 或你的网关地址
-export OPENAI_MODEL="gpt-4.1-mini"
-
-# 可选：覆盖默认服务地址
-export DATABASE_URL="mysql+aiomysql://root:password@127.0.0.1:3306/contract_review"
-export MINIO_ENDPOINT="127.0.0.1:9000"
-export MCP_SSE_URL="http://127.0.0.1:8000/sse"
-
-# 可选：工作流模式
-export REVIEW_WORKFLOW_MODE="langchain"   # 或 compat_direct
+# .env 文件示例
+DATABASE_URL=mysql+aiomysql://root:your-password@127.0.0.1:3306/contract_review
+MINIO_ENDPOINT=127.0.0.1:9000
+MINIO_ACCESS_KEY=your-access-key
+MINIO_SECRET_KEY=your-secret-key
+MINIO_BUCKET=contracts
+MCP_HTTP_BASE=http://127.0.0.1:8000
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_BASE_URL=
+OPENAI_MODEL=gpt-4.1-mini
+REVIEW_WORKFLOW_MODE=langchain
 ```
+
+> 后端 (`backend/app/main.py`) 和 MCP Server (`mcp_server/main.py`) 启动时会自动加载项目根目录的 `.env` 文件（通过 `python-dotenv`）。
 
 #### 10.3.3 启动 MCP Server
 
 ```bash
 # 在项目根目录下
 cd /path/to/Contract_Review
+conda activate env_test
 
 # 启动 MCP Server（SSE 传输，默认端口 8000）
 python mcp_server/main.py
@@ -543,7 +571,6 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 
 验证 MCP Server：
 ```bash
-# 检查 SSE 端点是否响应
 curl -s http://127.0.0.1:8000/sse -m 3 || echo "SSE endpoint reachable (timeout expected)"
 ```
 
@@ -552,15 +579,17 @@ curl -s http://127.0.0.1:8000/sse -m 3 || echo "SSE endpoint reachable (timeout 
 ```bash
 # 在另一个终端
 cd /path/to/Contract_Review
+conda activate env_test
 
 # 启动 Gateway（默认端口 8080）
-uvicorn backend.main:app --host 0.0.0.0 --port 8080
+# 注意：需要设置 PYTHONPATH 指向 backend 目录，解决模块导入问题
+PYTHONPATH=$(pwd)/backend uvicorn backend.main:app --host 0.0.0.0 --port 8080
 ```
 
 预期输出：
 ```text
-2025-01-01 12:00:00 INFO [app] Starting Contract Review Gateway ...
-2025-01-01 12:00:00 INFO [app] Database tables ensured.
+2026-05-12 12:00:00 INFO [app] Starting Contract Review Gateway ...
+2026-05-12 12:00:00 INFO [app] Database tables ensured.
 INFO:     Started server process [xxxxx]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
@@ -569,9 +598,34 @@ INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
 
 验证 Gateway：
 ```bash
-# 健康检查
 curl http://127.0.0.1:8080/health
 # 预期: {"status":"ok"}
+```
+
+#### 10.3.5 快速启动脚本
+
+可创建 `start.sh` 一键启动两个服务：
+
+```bash
+#!/bin/bash
+cd "$(dirname "$0")"
+conda activate env_test
+
+# 启动 MCP Server（后台）
+python mcp_server/main.py &
+MCP_PID=$!
+echo "MCP Server started (PID: $MCP_PID)"
+
+# 等待 MCP Server 就绪
+sleep 2
+
+# 启动 FastAPI Gateway（后台）
+PYTHONPATH=$(pwd)/backend uvicorn backend.main:app --host 0.0.0.0 --port 8080 &
+API_PID=$!
+echo "FastAPI Gateway started (PID: $API_PID)"
+
+echo "Services running. Press Ctrl+C to stop."
+wait
 ```
 
 ### 10.4 OnlyOffice 插件部署
@@ -686,6 +740,15 @@ export OPENAI_MODEL="your-model"
 
 ## 12. 故障排查
 
+### FastAPI 启动报 ModuleNotFoundError: No module named 'app'
+
+```text
+错误: ModuleNotFoundError: No module named 'app'
+原因: uvicorn 以 backend.main:app 启动时，Python 路径不包含 backend/ 目录
+解决: 启动时设置 PYTHONPATH
+  PYTHONPATH=$(pwd)/backend uvicorn backend.main:app --host 0.0.0.0 --port 8080
+```
+
 ### MCP Server 启动失败
 
 ```text
@@ -699,8 +762,19 @@ export OPENAI_MODEL="your-model"
 错误: Can't connect to MySQL server
 解决:
 1. 检查 MySQL 是否运行: mysql -u root -ppassword -e "SELECT 1"
-2. 检查 DATABASE_URL 环境变量是否正确
-3. 检查防火墙是否放行 3306 端口
+2. 检查 .env 文件中 DATABASE_URL 是否正确
+3. WSL 环境下 MySQL 在 Windows 上时，使用 Windows 网关 IP（如 172.27.0.1）
+4. 检查防火墙是否放行 3306 端口
+```
+
+### .env 文件未生效
+
+```text
+症状: 修改 .env 后服务仍使用旧配置
+解决:
+1. 确认 .env 文件在项目根目录（与 backend/ 和 mcp_server/ 同级）
+2. 确认 backend/app/main.py 和 mcp_server/main.py 中有 dotenv 加载代码
+3. 重启服务（.env 仅在启动时加载）
 ```
 
 ### Agent 调用工具失败
@@ -709,7 +783,7 @@ export OPENAI_MODEL="your-model"
 错误: LangChainWorkflowUnavailable: Cannot connect to MCP server
 解决:
 1. 确认 MCP Server 已启动: curl http://127.0.0.1:8000/sse
-2. 检查 MCP_SSE_URL 环境变量
+2. 检查 .env 中 MCP_HTTP_BASE 配置
 3. 检查 MCP Server 日志是否有 LLM 调用错误
 ```
 
@@ -735,7 +809,28 @@ export OPENAI_MODEL="your-model"
 
 ---
 
-## 13. 参考项目
+## 13. 变更记录
+
+### 2026-05-12 部署适配
+
+**环境配置**
+- 新增 `.env` 文件支持，后端和 MCP Server 启动时自动加载（`python-dotenv`）
+- `.env` 已加入 `.gitignore`，避免敏感信息提交
+
+**代码修改**
+- `backend/app/main.py`：启动时加载项目根目录 `.env` 文件
+- `mcp_server/main.py`：启动时加载项目根目录 `.env` 文件
+
+**部署说明**
+- FastAPI Gateway 启动需设置 `PYTHONPATH` 指向 `backend/` 目录：
+  ```bash
+  PYTHONPATH=$(pwd)/backend uvicorn backend.main:app --host 0.0.0.0 --port 8080
+  ```
+- WSL 环境下 MySQL 在 Windows 宿主机时，使用网关 IP（如 `172.27.0.1`）连接
+
+---
+
+## 14. 参考项目
 
 - https://github.com/CSlawyer1985/contract-review-pro
 - https://github.com/xiaodingfeng/contract-review
