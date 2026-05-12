@@ -8,6 +8,10 @@ from app.core.config import MINIO_ACCESS_KEY, MINIO_BUCKET, MINIO_ENDPOINT, MINI
 client = Minio(MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY, secret_key=MINIO_SECRET_KEY, secure=False)
 
 
+def get_minio_client() -> Minio:
+    return client
+
+
 async def save_onlyoffice_file(file_url: str, key: str) -> str:
     if not client.bucket_exists(MINIO_BUCKET):
         client.make_bucket(MINIO_BUCKET)

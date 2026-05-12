@@ -24,9 +24,10 @@
   - [10.4 OnlyOffice 插件部署](#104-onlyoffice-插件部署)
   - [10.5 验证部署](#105-验证部署)
 - [11. 开发指南](#11-开发指南)
-- [12. 故障排查](#12-故障排查)
-- [13. 变更记录](#13-变更记录)
-- [14. 参考项目](#14-参考项目)
+- [12. 测试用例](#12-测试用例)
+- [13. 故障排查](#13-故障排查)
+- [14. 变更记录](#14-变更记录)
+- [15. 参考项目](#15-参考项目)
 
 ---
 
@@ -97,8 +98,9 @@
 |---|---|---|
 | **MCP Server** | 暴露 5 个 LLM 驱动的合同审查与生成 Tools，每个工具内部调用 OpenAI 兼容 API 完成真实分析 | FastMCP + openai SDK |
 | **LangGraph Agent** | AI 应用层，连接模型、发现 MCP tools、发起 `tool_calls`、接收 `ToolMessage` 回填、汇总审查结论 | LangChain 1.x + LangGraph |
-| **FastAPI Gateway** | OnlyOffice callback、MinIO 落盘、数据库任务状态、触发审查工作流。含全局异常处理和结构化日志 | FastAPI + SQLAlchemy 2.0 |
-| **OnlyOffice Plugin** | 右侧边栏展示风险卡片，支持一键采纳将建议条款替换进文档 | OnlyOffice Plugin SDK |
+| **FastAPI Gateway** | Web 前端页面、合同生成/审查接口、OnlyOffice callback、MinIO 文档存储、数据库任务状态 | FastAPI + SQLAlchemy 2.0 |
+| **Web 前端** | 独立 Web 页面，支持合同文本审查、AI 合同生成、嵌入 OnlyOffice 在线编辑器 | HTML/JS + OnlyOffice API |
+| **OnlyOffice Plugin** | 编辑器右侧边栏插件，支持粘贴文本审查、风险卡片展示、一键采纳将建议条款插入文档 | OnlyOffice Plugin SDK |
 
 ---
 
@@ -110,12 +112,13 @@
 | ORM | SQLAlchemy (async) | >=2.0 |
 | 数据库 | MySQL (aiomysql) | >=0.3 |
 | 对象存储 | MinIO | >=7.2 |
+| 文档生成 | python-docx | >=1.2 |
 | AI 框架 | LangChain + LangGraph | >=1.2 |
 | MCP 适配 | langchain-mcp-adapters | >=0.2.2 |
 | LLM SDK | openai | >=2.26 |
 | MCP 协议 | mcp | >=1.27 |
 | 文档编辑 | OnlyOffice Document Server | - |
-| 前端 | OnlyOffice Plugin (HTML/JS) | - |
+| 前端 | Web 前端 + OnlyOffice Plugin (HTML/JS) | - |
 
 ---
 
@@ -129,12 +132,16 @@ Contract_Review/
 │
 ├── backend/                           # FastAPI 后端
 │   ├── main.py                        # Uvicorn 入口，re-export app
+│   ├── static/
+│   │   └── index.html                 # Web 前端页面（合同审查 + 合同生成 + OnlyOffice 编辑器）
 │   └── app/
 │       ├── main.py                    # FastAPI 应用工厂，启动事件，全局异常处理，dotenv 加载
 │       ├── api/
 │       │   └── routes.py              # API 路由定义
-│       │       ├── POST /api/onlyoffice/callback  # OnlyOffice 文件保存回调
-│       │       └── POST /api/review/start          # 合同审查入口
+│       │       ├── POST /api/onlyoffice/callback    # OnlyOffice 文件保存回调
+│       │       ├── POST /api/review/start            # 合同审查入口
+│       │       ├── POST /api/contract/generate       # 合同生成（LLM 起草）
+│       │       └── POST /api/contract/save-doc       # 保存合同为 .docx 到 MinIO
 │       ├── core/
 │       │   └── config.py              # 环境变量配置（数据库、MinIO、MCP、LLM）
 │       ├── db/
@@ -364,9 +371,63 @@ OnlyOffice Document Server 的文件保存回调。
 }
 ```
 
+### `POST /api/contract/generate`
+
+合同生成接口，调用 MCP 工具 `draft_contract_from_template` 生成完整合同草稿。
+
+**请求体**：
+```json
+{
+  "party_a": "北京星辰科技有限公司",
+  "party_b": "上海云端数据技术有限公司",
+  "subject": "企业数据中台建设项目技术服务",
+  "amount": "人民币150万元",
+  "duration": "六个月",
+  "jurisdiction": "北京市海淀区人民法院",
+  "extra": "需包含数据安全条款"
+}
+```
+
+**响应**：
+```json
+{
+  "contract_text": "技术服务合同\n\n甲方：北京星辰科技有限公司\n乙方：上海云端数据技术有限公司\n..."
+}
+```
+
+---
+
+### `POST /api/contract/save-doc`
+
+将合同文本保存为 `.docx` 文件上传到 MinIO，返回 presigned URL 供 OnlyOffice 编辑器加载。
+
+**请求体**：
+```json
+{
+  "contract_id": "gen-1715500000",
+  "contract_text": "合同正文内容..."
+}
+```
+
+**响应**：
+```json
+{
+  "url": "http://127.0.0.1:9000/contracts/contracts/gen-1715500000.docx?X-Amz-...",
+  "object": "contracts/gen-1715500000.docx"
+}
+```
+
+---
+
 ### `GET /health`
 
 健康检查接口，返回 `{"status": "ok"}`。
+
+---
+
+### `GET /`
+
+重定向到 Web 前端页面 `/static/index.html`，提供合同审查、合同生成和 OnlyOffice 在线编辑功能。
 
 ---
 
@@ -650,7 +711,11 @@ const API_BASE = "http://172.27.3.6:8080";
 docker restart onlyoffice
 ```
 
-4. 在 OnlyOffice 编辑器中，点击插件图标打开右侧边栏，输入 `contract_id` 并点击 "Start Review"。
+4. 在 OnlyOffice 编辑器中，点击插件图标打开右侧边栏：
+   - 粘贴合同文本到文本框
+   - 点击"开始审查"
+   - 审查完成后，风险卡片会展示在侧边栏
+   - 点击"采纳此建议"可将替代条款直接插入文档
 
 ### 10.5 验证部署
 
@@ -738,7 +803,90 @@ export OPENAI_MODEL="your-model"
 
 ---
 
-## 12. 故障排查
+## 12. 测试用例
+
+### 12.1 合同审查测试
+
+在 Web 页面（`http://localhost:8080`）的"合同审查"标签页中粘贴以下文本：
+
+```
+技术服务合同
+
+甲方：北京星辰科技有限公司
+乙方：上海云端数据技术有限公司
+
+第一条 服务内容
+甲方委托乙方提供企业数据中台建设项目的技术服务，具体需求以附件一为准。
+
+第二条 合同金额与付款
+合同总价为人民币壹佰伍拾万元整（¥1,500,000.00）。
+甲方应在合同签订后支付全款。
+
+第三条 服务期限
+本合同服务期限为六个月，自合同签订之日起计算。
+
+第四条 知识产权
+项目开发过程中产生的所有知识产权归甲方所有。
+
+第五条 保密义务
+双方应对本合同内容及履行过程中获悉的对方商业秘密保密。
+
+第六条 违约责任
+任何一方违反本合同约定的，应承担违约责任。
+
+第七条 不可抗力
+因不可抗力导致本合同无法履行的，双方均不承担违约责任。
+
+第八条 争议解决
+双方因本合同产生的争议，由甲方所在地人民法院管辖。
+
+甲方（盖章）：                    乙方（盖章）：
+法定代表人：                      法定代表人：
+签订日期：2026年1月1日
+```
+
+**预期结果**：
+- 整体风险等级：HIGH 或 MEDIUM
+- 识别出付款条件不明确、违约责任缺失、知识产权归属失衡等风险
+- 每个风险项包含原文摘录、法律依据、修改建议和替代条款
+
+### 12.2 合同生成测试
+
+在 Web 页面的"合同生成"标签页中填写以下要素：
+
+| 字段 | 值 |
+|---|---|
+| 甲方 | 深圳前海智联科技有限公司 |
+| 乙方 | 杭州数云信息技术有限公司 |
+| 合同标的 | 企业级 AI 智能客服系统定制开发 |
+| 金额 | 人民币贰佰万元整（¥2,000,000.00） |
+| 合同期限 | 自合同签订之日起八个月 |
+| 管辖法院 | 深圳市南山区人民法院 |
+| 其他要求 | 1. 系统需支持多语言（中英日韩）；2. 响应时间不超过 200ms；3. 需通过等保三级认证；4. 提供一年免费运维 |
+
+**预期结果**：
+- 生成一份结构完整的合同草稿
+- 包含合同主体、标的与范围、价款与支付、履行期限、违约责任、知识产权、保密条款、不可抗力、合同解除、争议解决等章节
+- 融入"其他要求"中的特殊条款（多语言、响应时间、等保三级、免费运维）
+
+### 12.3 OnlyOffice 集成测试
+
+1. 生成合同后，点击"在 OnlyOffice 中编辑"
+2. 预期：OnlyOffice 编辑器在页面内打开，加载生成的 `.docx` 文件
+3. 在编辑器中修改合同内容，点击"保存文档"
+4. 点击"提交审查"，自动跳转到审查标签页并触发审查
+
+### 12.4 OnlyOffice 侧边栏插件测试
+
+1. 在 OnlyOffice Document Server 中打开任意文档
+2. 点击插件图标，打开"合同审查"侧边栏
+3. 粘贴 12.1 中的合同文本，点击"开始审查"
+4. 审查完成后，风险卡片展示在侧边栏
+5. 点击"采纳此建议"，替代条款应插入到文档光标位置
+
+---
+
+## 13. 故障排查
 
 ### FastAPI 启动报 ModuleNotFoundError: No module named 'app'
 
@@ -809,7 +957,29 @@ export OPENAI_MODEL="your-model"
 
 ---
 
-## 13. 变更记录
+## 14. 变更记录
+
+### 2026-05-12 OnlyOffice 集成与 Web 前端
+
+**新功能**
+- **Web 前端页面**（`/`）：独立 Web 界面，支持合同审查、AI 合同生成、嵌入 OnlyOffice 在线编辑器
+- **合同生成接口**（`POST /api/contract/generate`）：调用 MCP 工具 `draft_contract_from_template` 生成合同草稿
+- **文档保存接口**（`POST /api/contract/save-doc`）：将合同文本转为 `.docx` 上传 MinIO，返回 presigned URL
+- **OnlyOffice 编辑器嵌入**：生成/审查后可一键打开 OnlyOffice 在线编辑，支持编辑、保存、提交审查
+- **OnlyOffice 插件升级**：侧边栏支持直接粘贴文本审查、一键采纳替代条款插入文档
+
+**新增依赖**
+- `python-docx>=1.2.0`：合同文本转 `.docx` 格式
+
+**代码修改**
+- `backend/app/main.py`：挂载静态文件、根路径重定向到 Web 页面
+- `backend/app/api/routes.py`：新增合同生成、文档保存接口，审查接口支持自动创建 contract 记录
+- `backend/app/services/storage.py`：暴露 `get_minio_client()`
+- `backend/static/index.html`：Web 前端页面
+- `frontend/plugin/index.html`：侧边栏 UI 重设计
+- `frontend/plugin/app.js`：一键采纳功能（OnlyOffice 内插入文本 / 剪贴板复制）
+
+---
 
 ### 2026-05-12 部署适配
 
@@ -830,7 +1000,7 @@ export OPENAI_MODEL="your-model"
 
 ---
 
-## 14. 参考项目
+## 15. 参考项目
 
 - https://github.com/CSlawyer1985/contract-review-pro
 - https://github.com/xiaodingfeng/contract-review

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contract Review Pro</title>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-light: #eef2ff;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+  --high: #ef4444;
+  --high-bg: #fef2f2;
+  --medium: #f59e0b;
+  --medium-bg: #fffbeb;
+  --low: #22c55e;
+  --low-bg: #f0fdf4;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.04);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+}
+.header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4f46e5 100%);
+  color: #fff; padding: 0; position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 4px 20px rgba(79,70,229,.25);
+}
+.header-inner {
+  max-width: 1280px; margin: 0 auto; padding: 18px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.header-left { display: flex; align-items: center; gap: 14px; }
+.logo {
+  width: 40px; height: 40px; background: rgba(255,255,255,.15); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+  backdrop-filter: blur(8px);
+}
+.header h1 { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.badge {
+  background: rgba(255,255,255,.12); padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; color: rgba(255,255,255,.8); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.1);
+}
+.container { max-width: 1280px; margin: 0 auto; padding: 28px 32px 48px; }
+.tabs {
+  display: flex; gap: 4px; margin-bottom: 28px; background: var(--surface);
+  padding: 5px; border-radius: var(--radius); box-shadow: var(--shadow); width: fit-content;
+}
+.tab {
+  padding: 10px 28px; cursor: pointer; border: none; background: transparent;
+  color: var(--text-secondary); font-size: 14px; font-weight: 500; border-radius: 8px;
+  transition: all .2s ease; display: flex; align-items: center; gap: 8px;
+}
+.tab:hover { color: var(--text); background: var(--bg); }
+.tab.active { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(79,70,229,.3); }
+.tab-icon { font-size: 16px; }
+.panel { display: none; animation: fadeIn .3s ease; }
+.panel.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.card-input {
+  background: var(--surface); border-radius: var(--radius); padding: 28px;
+  box-shadow: var(--shadow); border: 1px solid var(--border);
+}
+.card-input > label {
+  display: flex; align-items: center; gap: 8px; font-weight: 600;
+  margin-bottom: 14px; font-size: 15px; color: var(--text);
+}
+textarea {
+  width: 100%; height: 320px; padding: 16px; border: 1.5px solid var(--border);
+  border-radius: 10px; font-size: 14px; font-family: inherit; resize: vertical;
+  line-height: 1.7; color: var(--text); background: var(--bg);
+  transition: border-color .2s, box-shadow .2s;
+}
+textarea::placeholder { color: var(--text-muted); }
+textarea:focus {
+  outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79,70,229,.1); background: #fff;
+}
+.actions { margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.btn {
+  padding: 11px 32px; border: none; border-radius: 10px; font-size: 14px;
+  font-weight: 600; cursor: pointer; transition: all .2s ease;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(79,70,229,.3); }
+.btn-primary:hover { background: var(--primary-hover); box-shadow: 0 4px 12px rgba(79,70,229,.4); transform: translateY(-1px); }
+.btn-primary:disabled { background: #a5b4fc; cursor: not-allowed; box-shadow: none; transform: none; }
+.btn-outline {
+  background: transparent; color: var(--primary); border: 1.5px solid var(--primary);
+  box-shadow: none;
+}
+.btn-outline:hover { background: var(--primary-light); transform: translateY(-1px); }
+.btn-success { background: #059669; color: #fff; box-shadow: 0 2px 8px rgba(5,150,105,.3); }
+.btn-success:hover { background: #047857; transform: translateY(-1px); }
+
+.status-msg { font-size: 13px; color: var(--text-muted); }
+.results { margin-top: 28px; }
+
+/* Summary Card */
+.summary-card {
+  background: var(--surface); border-radius: var(--radius); padding: 24px;
+  margin-bottom: 20px; box-shadow: var(--shadow); border: 1px solid var(--border);
+}
+.summary-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.summary-header h3 { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.summary-body { font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
+.meta-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.meta-item { display: flex; flex-direction: column; gap: 2px; }
+.meta-label { font-size: 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+.meta-value { font-size: 15px; font-weight: 600; color: var(--text); }
+.next-actions {
+  margin-top: 16px; padding: 14px 16px; background: var(--primary-light);
+  border-radius: 10px; border: 1px solid #c7d2fe;
+}
+.next-actions h4 { font-size: 13px; font-weight: 600; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.next-actions ul { list-style: none; padding: 0; }
+.next-actions li { font-size: 13px; color: #4338ca; padding: 3px 0; padding-left: 16px; position: relative; }
+.next-actions li::before { content: ""; position: absolute; left: 0; top: 10px; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+
+.risk-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 12px;
+  border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: .3px;
+}
+.risk-badge.high { background: var(--high-bg); color: var(--high); border: 1px solid #fecaca; }
+.risk-badge.medium { background: var(--medium-bg); color: #b45309; border: 1px solid #fde68a; }
+.risk-badge.low { background: var(--low-bg); color: #15803d; border: 1px solid #bbf7d0; }
+
+.entities-card {
+  background: var(--surface); border-radius: var(--radius); padding: 24px;
+  margin-bottom: 20px; box-shadow: var(--shadow); border: 1px solid var(--border);
+}
+.entities-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.entity-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.entity-item { background: var(--bg); padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); }
+.entity-item .key { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.entity-item .val { font-size: 14px; color: var(--text); font-weight: 500; }
+
+.section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.findings-list { display: flex; flex-direction: column; gap: 14px; }
+.finding-card {
+  background: var(--surface); border-radius: var(--radius); padding: 20px;
+  box-shadow: var(--shadow); border: 1px solid var(--border); border-left: 4px solid #cbd5e1;
+  transition: box-shadow .2s, transform .2s;
+}
+.finding-card:hover { box-shadow: var(--shadow-md); transform: translateX(2px); }
+.finding-card.high { border-left-color: var(--high); }
+.finding-card.medium { border-left-color: var(--medium); }
+.finding-card.low { border-left-color: var(--low); }
+.finding-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.finding-header h4 { font-size: 15px; font-weight: 600; }
+.finding-body { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+.field { margin-bottom: 10px; display: flex; gap: 8px; }
+.field .label { font-weight: 600; color: var(--text); min-width: 64px; flex-shrink: 0; font-size: 13px; }
+.field .content { flex: 1; }
+.proposed { background: var(--low-bg); border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px; margin-top: 14px; font-size: 13px; line-height: 1.7; }
+.proposed .label { font-weight: 600; color: #15803d; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.proposed .content { color: #166534; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 14px; }
+.form-group { display: flex; flex-direction: column; }
+.form-group label { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.form-group input {
+  padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 10px;
+  font-size: 14px; color: var(--text); background: var(--bg); transition: border-color .2s, box-shadow .2s;
+}
+.form-group input::placeholder { color: var(--text-muted); }
+.form-group input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,.1); background: #fff; }
+.full-width { grid-column: 1 / -1; }
+
+.generated-text {
+  background: var(--surface); border-radius: var(--radius); padding: 28px; margin-top: 20px;
+  box-shadow: var(--shadow); border: 1px solid var(--border); white-space: pre-wrap;
+  font-size: 14px; line-height: 1.9; color: var(--text);
+}
+
+.error-msg {
+  background: var(--high-bg); border: 1px solid #fecaca; color: #b91c1c;
+  padding: 14px 18px; border-radius: 10px; margin-top: 16px; font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.loading-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(255,255,255,.7);
+  backdrop-filter: blur(4px); z-index: 50; align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px;
+}
+.loading-overlay.show { display: flex; }
+.loading-text { font-size: 15px; color: var(--text-secondary); font-weight: 500; }
+.big-spinner {
+  width: 48px; height: 48px; border: 4px solid var(--border); border-top-color: var(--primary);
+  border-radius: 50%; animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* OnlyOffice Editor Section */
+.editor-section {
+  margin-top: 28px; background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); border: 1px solid var(--border); overflow: hidden;
+}
+.editor-header {
+  padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border); background: var(--bg);
+}
+.editor-header h3 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.editor-header .btn-close {
+  width: 32px; height: 32px; border: none; background: transparent; cursor: pointer;
+  border-radius: 8px; font-size: 18px; color: var(--text-muted); transition: all .2s;
+}
+.editor-header .btn-close:hover { background: var(--border); color: var(--text); }
+#editorContainer { width: 100%; height: 700px; border: none; }
+
+.editor-actions {
+  padding: 12px 24px; border-top: 1px solid var(--border); background: var(--bg);
+  display: flex; gap: 12px; align-items: center;
+}
+
+@media (max-width: 768px) {
+  .header-inner { padding: 14px 16px; }
+  .container { padding: 20px 16px 40px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .entity-grid { grid-template-columns: 1fr; }
+  .meta-row { flex-direction: column; gap: 12px; }
+  .tabs { width: 100%; }
+  .tab { flex: 1; justify-content: center; }
+  #editorContainer { height: 500px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="logo">&#9878;</div>
+      <h1>Contract Review Pro</h1>
+    </div>
+    <div class="header-right">
+      <span class="badge">LangGraph Agent + MCP</span>
+      <span class="badge">OnlyOffice</span>
+      <span class="badge">V1.4</span>
+    </div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="big-spinner"></div>
+  <div class="loading-text" id="loadingText">正在处理，请稍候...</div>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <div class="tab active" data-panel="review">
+      <span class="tab-icon">&#128269;</span> 合同审查
+    </div>
+    <div class="tab" data-panel="generate">
+      <span class="tab-icon">&#9997;</span> 合同生成
+    </div>
+  </div>
+
+  <!-- Review Panel -->
+  <div id="review" class="panel active">
+    <div class="card-input">
+      <label>&#128196; 合同文本</label>
+      <textarea id="contractText" placeholder="在此粘贴合同正文内容...&#10;&#10;支持各类合同文本，系统将自动提取合同要素、识别法律风险并生成修订建议。"></textarea>
+      <div class="actions">
+        <button class="btn btn-primary" id="reviewBtn">
+          <span>&#128269;</span> 开始审查
+        </button>
+        <span class="status-msg" id="reviewStatus"></span>
+      </div>
+    </div>
+    <div id="reviewResults" class="results"></div>
+  </div>
+
+  <!-- Generate Panel -->
+  <div id="generate" class="panel">
+    <div class="card-input">
+      <label>&#9997; 合同要素</label>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>甲方</label>
+          <input type="text" id="partyA" placeholder="甲方名称（必填）">
+        </div>
+        <div class="form-group">
+          <label>乙方</label>
+          <input type="text" id="partyB" placeholder="乙方名称（必填）">
+        </div>
+        <div class="form-group">
+          <label>合同标的</label>
+          <input type="text" id="subject" placeholder="合同标的描述">
+        </div>
+        <div class="form-group">
+          <label>金额</label>
+          <input type="text" id="amount" placeholder="合同金额（含币种）">
+        </div>
+        <div class="form-group">
+          <label>合同期限</label>
+          <input type="text" id="duration" placeholder="如：一年 / 2026.1.1 - 2026.12.31">
+        </div>
+        <div class="form-group">
+          <label>管辖法院</label>
+          <input type="text" id="jurisdiction" placeholder="管辖法院或仲裁机构">
+        </div>
+        <div class="form-group full-width">
+          <label>其他要求</label>
+          <input type="text" id="extraReqs" placeholder="特殊条款要求、行业限制等（可选）">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="generateBtn">
+          <span>&#9997;</span> 生成合同
+        </button>
+        <span class="status-msg" id="generateStatus"></span>
+      </div>
+    </div>
+    <div id="generateResults" class="results"></div>
+  </div>
+
+  <!-- OnlyOffice Editor Section -->
+  <div id="editorSection" class="editor-section" style="display:none;">
+    <div class="editor-header">
+      <h3>&#128196; 在线文档编辑</h3>
+      <button class="btn-close" id="closeEditor" title="关闭编辑器">&times;</button>
+    </div>
+    <div id="editorContainer"></div>
+    <div class="editor-actions">
+      <button class="btn btn-success" id="editorSaveBtn">
+        &#128190; 保存文档
+      </button>
+      <button class="btn btn-outline" id="editorReviewBtn">
+        &#128269; 提交审查
+      </button>
+      <span class="status-msg" id="editorStatus"></span>
+    </div>
+  </div>
+</div>
+
+<script src="http://localhost:9002/web-apps/apps/api/documents/api.js"></script>
+<script>
+const API_BASE = window.location.origin;
+const OO_BASE = "http://localhost:9002";
+const $ = id => document.getElementById(id);
+
+let currentContractId = null;
+let currentContractText = null;
+let docEditor = null;
+
+function showLoading(text) {
+  $('loadingText').textContent = text || '正在处理，请稍候...';
+  $('loadingOverlay').classList.add('show');
+}
+function hideLoading() { $('loadingOverlay').classList.remove('show'); }
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.panel).classList.add('active');
+  });
+});
+
+// ========== Review ==========
+$('reviewBtn').addEventListener('click', async () => {
+  const text = $('contractText').value.trim();
+  if (!text) { $('contractText').focus(); return; }
+
+  currentContractId = 'web-' + Date.now();
+  currentContractText = text;
+
+  $('reviewBtn').disabled = true;
+  showLoading('AI 正在审查合同，请稍候...');
+  $('reviewResults').innerHTML = '';
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/review/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contract_id: currentContractId, contract_text: text }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || '请求失败');
+    }
+    const data = await resp.json();
+    renderReviewResults(data, $('reviewResults'), text);
+  } catch (e) {
+    $('reviewResults').innerHTML = `<div class="error-msg"><span>&#9888;</span> 审查失败：${e.message}</div>`;
+  } finally {
+    $('reviewBtn').disabled = false;
+    hideLoading();
+  }
+});
+
+function renderReviewResults(data, root, contractText) {
+  root.innerHTML = '';
+  const summary = data.summary || {};
+  const overallRisk = (summary.overall_risk || 'LOW').toUpperCase();
+  const findings = data.findings || [];
+  const entities = data.entities || {};
+
+  // Summary
+  const sc = document.createElement('div');
+  sc.className = 'summary-card';
+  sc.innerHTML = `
+    <div class="summary-header">
+      <h3>&#128202; 审查摘要</h3>
+      <span class="risk-badge ${overallRisk.toLowerCase()}">${overallRisk}</span>
+    </div>
+    <div class="summary-body">${summary.review_summary || '暂无摘要'}</div>
+    <div class="meta-row">
+      <div class="meta-item"><span class="meta-label">任务 ID</span><span class="meta-value">${(data.task_id || '-').substring(0,12)}...</span></div>
+      <div class="meta-item"><span class="meta-label">风险评分</span><span class="meta-value">${data.risk_score || 0}</span></div>
+      <div class="meta-item"><span class="meta-label">风险项</span><span class="meta-value">${findings.length} 个</span></div>
+      <div class="meta-item"><span class="meta-label">整体风险</span><span class="meta-value">${overallRisk}</span></div>
+    </div>
+    ${(summary.next_actions || []).length ? `
+      <div class="next-actions">
+        <h4>&#9888; 建议操作</h4>
+        <ul>${summary.next_actions.map(a => `<li>${a}</li>`).join('')}</ul>
+      </div>` : ''}
+    <div style="margin-top:16px;">
+      <button class="btn btn-outline" onclick="openInEditor('${currentContractId}', \`${encodeURIComponent(contractText)}\`)">
+        &#128196; 在 OnlyOffice 中编辑
+      </button>
+    </div>
+  `;
+  root.appendChild(sc);
+
+  // Entities
+  const entKeys = Object.entries(entities).filter(([k,v]) => v && k !== '_raw');
+  if (entKeys.length) {
+    const entLabels = { party_a: '甲方', party_b: '乙方', amount: '金额', jurisdiction: '管辖', effective_date: '生效日期', subject: '标的' };
+    const ec = document.createElement('div');
+    ec.className = 'entities-card';
+    ec.innerHTML = `<h3>&#128203; 合同要素</h3><div class="entity-grid">${
+      entKeys.map(([k,v]) => `<div class="entity-item"><div class="key">${entLabels[k]||k}</div><div class="val">${v}</div></div>`).join('')
+    }</div>`;
+    root.appendChild(ec);
+  }
+
+  // Findings
+  if (findings.length) {
+    const sec = document.createElement('div');
+    sec.innerHTML = `<div class="section-title">&#128680; 风险详情（${findings.length} 项）</div>`;
+    const list = document.createElement('div');
+    list.className = 'findings-list';
+    findings.forEach(item => {
+      const sev = (item.severity || 'LOW').toLowerCase();
+      const card = document.createElement('div');
+      card.className = `finding-card ${sev}`;
+      card.innerHTML = `
+        <div class="finding-header">
+          <h4>${item.risk_type || '未知风险'}</h4>
+          <span class="risk-badge ${sev}">${(item.severity||'LOW').toUpperCase()}</span>
+        </div>
+        <div class="finding-body">
+          <div class="field"><span class="label">原文</span><span class="content">${item.original_text||'-'}</span></div>
+          <div class="field"><span class="label">法律依据</span><span class="content">${item.legal_basis||'-'}</span></div>
+          <div class="field"><span class="label">修改建议</span><span class="content">${item.suggestion||'-'}</span></div>
+        </div>
+        ${item.proposed_clause ? `<div class="proposed"><div class="label">&#9997; 替代条款</div><div class="content">${item.proposed_clause}</div></div>` : ''}
+      `;
+      list.appendChild(card);
+    });
+    sec.appendChild(list);
+    root.appendChild(sec);
+  }
+}
+
+// ========== Generate ==========
+$('generateBtn').addEventListener('click', async () => {
+  const formData = {
+    party_a: $('partyA').value.trim(),
+    party_b: $('partyB').value.trim(),
+    subject: $('subject').value.trim(),
+    amount: $('amount').value.trim(),
+    duration: $('duration').value.trim(),
+    jurisdiction: $('jurisdiction').value.trim(),
+    extra: $('extraReqs').value.trim(),
+  };
+  if (!formData.party_a || !formData.party_b) {
+    (!formData.party_a ? $('partyA') : $('partyB')).focus();
+    return;
+  }
+
+  $('generateBtn').disabled = true;
+  showLoading('AI 正在生成合同草稿，请稍候...');
+  $('generateResults').innerHTML = '';
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/contract/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || '请求失败');
+    }
+    const data = await resp.json();
+    const text = data.contract_text || data.detail || '无内容';
+    currentContractText = text;
+    currentContractId = 'gen-' + Date.now();
+
+    const r = $('generateResults');
+    r.innerHTML = `
+      <div class="generated-text">${text}</div>
+      <div style="margin-top:16px; display:flex; gap:12px;">
+        <button class="btn btn-outline" onclick="openInEditor('${currentContractId}', \`${encodeURIComponent(text)}\`)">
+          &#128196; 在 OnlyOffice 中编辑
+        </button>
+      </div>
+    `;
+  } catch (e) {
+    $('generateResults').innerHTML = `<div class="error-msg"><span>&#9888;</span> 生成失败：${e.message}</div>`;
+  } finally {
+    $('generateBtn').disabled = false;
+    hideLoading();
+  }
+});
+
+// ========== OnlyOffice Editor ==========
+async function openInEditor(contractId, encodedText) {
+  const text = decodeURIComponent(encodedText || '');
+  if (!text) return;
+
+  showLoading('正在保存文档并打开编辑器...');
+
+  try {
+    // 1. Save contract text as .docx to MinIO
+    const resp = await fetch(`${API_BASE}/api/contract/save-doc`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contract_id: contractId, contract_text: text }),
+    });
+    if (!resp.ok) throw new Error('文档保存失败');
+    const { url } = await resp.json();
+
+    // 2. Show editor section
+    $('editorSection').style.display = 'block';
+    $('editorSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // 3. Destroy previous editor instance
+    if (docEditor) {
+      try { docEditor.destroyAll(); } catch(e) {}
+      docEditor = null;
+    }
+    $('editorContainer').innerHTML = '';
+
+    // 4. Create unique key to force fresh document
+    const docKey = contractId + '-' + Date.now();
+
+    // 5. Initialize OnlyOffice editor
+    docEditor = new DocsAPI.DocEditor("editorContainer", {
+      document: {
+        fileType: "docx",
+        key: docKey,
+        title: `合同-${contractId}.docx`,
+        url: url,
+        permissions: { comment: true, download: true, edit: true, print: true, review: true },
+      },
+      documentType: "word",
+      editorConfig: {
+        mode: "edit",
+        lang: "zh",
+        callbackUrl: `${API_BASE}/api/onlyoffice/callback`,
+        user: { id: "web-user", name: "合同编辑者" },
+        customization: {
+          forcesave: true,
+          compactHeader: true,
+          toolbarNoTabs: false,
+          plugins: true,
+        },
+      },
+      height: "700px",
+      width: "100%",
+    });
+
+    $('editorStatus').textContent = '编辑器已打开';
+  } catch (e) {
+    $('editorStatus').textContent = '';
+    alert('打开编辑器失败：' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// Close editor
+$('closeEditor').addEventListener('click', () => {
+  if (docEditor) {
+    try { docEditor.destroyAll(); } catch(e) {}
+    docEditor = null;
+  }
+  $('editorSection').style.display = 'none';
+  $('editorContainer').innerHTML = '';
+});
+
+// Save button (triggers OnlyOffice force save)
+$('editorSaveBtn').addEventListener('click', () => {
+  if (docEditor) {
+    try {
+      docEditor.processServiceCommand({ c: "forceSave", data: "" });
+      $('editorStatus').textContent = '保存指令已发送';
+    } catch(e) {
+      $('editorStatus').textContent = '保存失败：' + e.message;
+    }
+  }
+});
+
+// Review from editor
+$('editorReviewBtn').addEventListener('click', async () => {
+  if (!currentContractText) {
+    alert('没有可审查的合同文本');
+    return;
+  }
+  // Switch to review tab and trigger review
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('.tab[data-panel="review"]').classList.add('active');
+  $('review').classList.add('active');
+  $('contractText').value = currentContractText;
+  $('reviewBtn').click();
+});
+</script>
+</body>
+</html>
